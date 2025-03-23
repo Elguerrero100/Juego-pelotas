@@ -1,0 +1,199 @@
+// Game variables
+let canvas, ctx;
+let player, balls = [];
+let score = 0;
+let lives = 3;
+let gameRunning = false;
+let animationId;
+
+// Game settings
+const settings = {
+    ballSpeed: 2,
+    ballGenerationRate: 1500, // milliseconds
+    playerSpeed: 8,
+    minBallSize: 15,
+    maxBallSize: 30,
+    ballColors: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3']
+};
+
+// Key states for smooth movement
+const keys = {
+    ArrowLeft: false,
+    ArrowRight: false
+};
+
+// Initialize the game
+function init() {
+    // Get canvas and context
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    
+    // Set canvas dimensions to match its display size
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    // Create player
+    const playerWidth = 80;
+    const playerHeight = 20;
+    player = {
+        x: canvas.width / 2 - playerWidth / 2,
+        y: canvas.height - playerHeight - 10,
+        width: playerWidth,
+        height: playerHeight,
+        color: '#333',
+        speed: settings.playerSpeed
+    };
+    
+    // Event listeners for keyboard controls
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            keys[e.key] = true;
+        }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            keys[e.key] = false;
+        }
+    });
+    
+    // Event listeners for buttons
+    document.getElementById('startButton').addEventListener('click', startGame);
+    document.getElementById('restartButton').addEventListener('click', restartGame);
+    
+    // Show start screen
+    document.getElementById('startScreen').classList.remove('hidden');
+    document.getElementById('gameOver').classList.add('hidden');
+}
+
+// Start the game
+function startGame() {
+    // Hide start screen
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOver').classList.add('hidden');
+    
+    // Reset game state
+    score = 0;
+    lives = 3;
+    balls = [];
+    gameRunning = true;
+    
+    // Update UI
+    document.getElementById('score').textContent = score;
+    document.getElementById('lives').textContent = lives;
+    
+    // Start ball generation
+    generateBalls();
+    
+    // Start game loop
+    gameLoop();
+}
+
+// Restart the game
+function restartGame() {
+    cancelAnimationFrame(animationId);
+    startGame();
+}
+
+// Generate balls at random intervals
+function generateBalls() {
+    if (!gameRunning) return;
+    
+    // Create a new ball
+    const size = Math.random() * (settings.maxBallSize - settings.minBallSize) + settings.minBallSize;
+    const x = Math.random() * (canvas.width - size);
+    const colorIndex = Math.floor(Math.random() * settings.ballColors.length);
+    
+    const ball = {
+        x: x,
+        y: -size,
+        size: size,
+        color: settings.ballColors[colorIndex],
+        speed: settings.ballSpeed * (1 + (Math.random() - 0.5) * 0.5) // Random speed variation
+    };
+    
+    balls.push(ball);
+    
+    // Schedule next ball generation
+    setTimeout(generateBalls, settings.ballGenerationRate);
+}
+
+// Game loop
+function gameLoop() {
+    if (!gameRunning) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Update player position based on key states
+    if (keys.ArrowLeft && player.x > 0) {
+        player.x -= player.speed;
+    }
+    if (keys.ArrowRight && player.x < canvas.width - player.width) {
+        player.x += player.speed;
+    }
+    
+    // Draw player
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    
+    // Update and draw balls
+    for (let i = balls.length - 1; i >= 0; i--) {
+        const ball = balls[i];
+        
+        // Move ball
+        ball.y += ball.speed;
+        
+        // Check if ball is caught
+        if (ball.y + ball.size > player.y && 
+            ball.x + ball.size > player.x && 
+            ball.x < player.x + player.width && 
+            ball.y < player.y + player.height) {
+            // Ball caught
+            balls.splice(i, 1);
+            score += Math.floor(ball.size); // Bigger balls = more points
+            document.getElementById('score').textContent = score;
+            
+            // Increase difficulty every 100 points
+            if (score % 100 === 0 && score > 0) {
+                settings.ballSpeed += 0.5;
+                settings.ballGenerationRate = Math.max(500, settings.ballGenerationRate - 100);
+            }
+            continue;
+        }
+        
+        // Check if ball is missed
+        if (ball.y > canvas.height) {
+            balls.splice(i, 1);
+            lives--;
+            document.getElementById('lives').textContent = lives;
+            
+            // Check game over
+            if (lives <= 0) {
+                gameOver();
+                return;
+            }
+            continue;
+        }
+        
+        // Draw ball
+        ctx.beginPath();
+        ctx.arc(ball.x + ball.size/2, ball.y + ball.size/2, ball.size/2, 0, Math.PI * 2);
+        ctx.fillStyle = ball.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+    
+    // Continue game loop
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+// Game over
+function gameOver() {
+    gameRunning = false;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('gameOver').classList.remove('hidden');
+}
+
+// Initialize the game when the page loads
+window.addEventListener('load', init);
